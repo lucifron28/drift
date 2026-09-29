@@ -75,20 +75,9 @@ final class AudioDownloader: ObservableObject {
 
             // c. If YouTube URL
             if isYouTube {
-                statusMessage = "Fetching YouTube metadata..."
-                progress = 0.15
-                let yt = YouTube(url: url, methods: [.local, .remote])
-                guard !yt.videoID.isEmpty else {
-                    throw AudioDownloaderError.invalidYouTubeURL
-                }
-
-                let meta = try? await yt.metadata
-
                 // Derive title
                 if let customTitle = customTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !customTitle.isEmpty {
                     finalTitle = customTitle
-                } else if let metaTitle = meta?.title.trimmingCharacters(in: .whitespacesAndNewlines), !metaTitle.isEmpty {
-                    finalTitle = metaTitle
                 } else {
                     finalTitle = "YouTube Audio"
                 }
@@ -101,7 +90,12 @@ final class AudioDownloader: ObservableObject {
                 }
 
                 statusMessage = "Resolving audio streams..."
-                progress = 0.30
+                progress = 0.25
+
+                let yt = YouTube(url: url, methods: [.remote])
+                guard !yt.videoID.isEmpty else {
+                    throw AudioDownloaderError.invalidYouTubeURL
+                }
 
                 let streams = try await yt.streams
                 let audioStreams = streams.filterAudioOnly()
