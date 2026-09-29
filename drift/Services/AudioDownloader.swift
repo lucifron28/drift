@@ -77,8 +77,7 @@ final class AudioDownloader: ObservableObject {
             if isYouTube {
                 statusMessage = "Fetching YouTube metadata..."
                 progress = 0.15
-
-                let yt = YouTube(url: url)
+                let yt = YouTube(url: url, methods: [.local, .remote])
                 guard !yt.videoID.isEmpty else {
                     throw AudioDownloaderError.invalidYouTubeURL
                 }
@@ -192,11 +191,58 @@ final class AudioDownloader: ObservableObject {
             return song
 
         } catch {
-            // i. Catch and set errorMessage if any step fails
             isDownloading = false
-            errorMessage = error.localizedDescription
+            let cleanMessage = formatUserFacingErrorMessage(from: error)
+            errorMessage = cleanMessage
             statusMessage = "Download failed."
             throw error
         }
+    }
+
+    private func formatUserFacingErrorMessage(from error: Error) -> String {
+        if let downloaderError = error as? AudioDownloaderError {
+            return downloaderError.localizedDescription
+        }
+
+        if let ytError = error as? YouTubeKitError {
+            switch ytError {
+            case .videoUnavailable:
+                return "This video is unavailable or no longer exists."
+            case .videoPrivate:
+                return "This video is private and cannot be downloaded."
+            case .videoAgeRestricted:
+                return "This video is age-restricted and cannot be downloaded."
+            case .membersOnly:
+                return "This video is restricted to channel members."
+            case .videoRegionBlocked:
+                return "This video is not available in your region."
+            case .liveStreamError:
+                return "Livestreams cannot be downloaded as audio."
+            case .recordingUnavailable:
+                return "The recording for this stream is currently unavailable."
+            case .extractError, .htmlParseError, .regexMatchError, .maxRetriesExceeded:
+                return "Could not extract audio stream from this YouTube video. Please check the URL or try again."
+            }
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost:
+                return "Internet connection lost. Please check your network and try again."
+            case .timedOut:
+                return "The connection timed out while downloading. Please try again."
+            case .cannotFindHost, .cannotConnectToHost:
+                return "Unable to connect to the audio server. Please check the URL."
+            default:
+                return "Network error: \(urlError.localizedDescription)"
+            }
+        }
+
+        let desc = error.localizedDescription
+        if desc.contains("YouTubeKit") || desc.contains("SignatureSolver") || desc.contains("decoding") || desc.contains("decode") {
+            return "Could not extract audio stream from this video. Please verify the URL."
+        }
+
+        return desc
     }
 }
